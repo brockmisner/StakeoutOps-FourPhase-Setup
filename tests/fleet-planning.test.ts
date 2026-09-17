@@ -69,6 +69,22 @@ describe("fleet capacity forecast",()=>{
   it("does not mutate the source data",()=>{
     const data=snapshot([run("one")]);const original=JSON.stringify(data);buildFleetPlan(data,options);expect(JSON.stringify(data)).toBe(original);
   });
+  it("forecasts 50 phones across ten clients without overbooking three subscriptions",()=>{
+    const fleet=Array.from({length:50},(_,i)=>({id:`phone-${i}`,name:`Phone ${i+1}`,imageId:`physical-${i}`,enabled:true,status:2}));
+    const work=Array.from({length:250},(_,i)=>run(`task-${i}`,{phoneId:fleet[i%50].id,clientId:`client-${Math.floor((i%50)/5)}`,expectedDurationSeconds:1200}));
+    const plan=buildFleetPlan(snapshot(work),{...options,capacity:3,phones:fleet});
+    expect(plan.events).toHaveLength(250);
+    expect(plan.events.every(event=>event.lane!=null&&event.lane<3)).toBe(true);
+    for(const lane of plan.lanes){
+      const sorted=[...lane].sort((a,b)=>a.start-b.start);
+      expect(sorted.every((item,i)=>i===0||item.start>=sorted[i-1].end)).toBe(true);
+    }
+    for(const phone of fleet){
+      const work=plan.events.filter(event=>event.phoneId===phone.id).sort((a,b)=>a.start!-b.start!);
+      expect(work.every((item,i)=>i===0||item.start!>=work[i-1].end!)).toBe(true);
+    }
+    expect(Math.max(...plan.events.map(event=>event.end!))).toBeGreaterThan(now+86400_000);
+  });
 });
 describe("planning calendar dates",()=>{
   it("uses 23- and 25-hour local days across DST",()=>{

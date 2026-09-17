@@ -20,3 +20,13 @@
 @media(prefers-reduced-motion:reduce) { .timelineScroll { scroll-behavior:auto; }.planner button { transition:none; } }
 
 .periodWarning { color:#a86515; font-weight:600; }.planner button:disabled { cursor:not-allowed; opacity:.5; }
+
+.mobileClientMeta { display:none; }
+@media(max-width:650px) {
+  .clientTable { min-width:0; table-layout:fixed; }
+  .clientTable th:first-child { width:54%; }.clientTable th:nth-child(4) { width:46%; }
+  .clientTable th:nth-child(2),.clientTable th:nth-child(3),.clientTable th:nth-child(5),.clientTable td:nth-child(2),.clientTable td:nth-child(3),.clientTable td:nth-child(5) { display:none; }
+  .clientTable th,.clientTable td { padding:12px 6px; }.clientButton { max-width:100%; }.clientButton strong { font-size:11px; overflow-wrap:anywhere; }.initials { width:24px;height:24px; }
+  .clientButton>svg { flex-shrink:0; width:12px; }.completion { min-width:0; display:grid; gap:7px; }.completion span { font-size:11px; text-align:right; }.phoneList { padding:10px 8px; }
+  .mobileClientMeta { display:block; font-size:11px; color:#63748c; line-height:1.6; margin-bottom:10px; }.phoneList article>div:first-child { flex-wrap:wrap; }.phoneList article>div>span { margin-left:0; }
+}
