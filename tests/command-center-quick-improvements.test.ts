@@ -185,10 +185,7 @@ describe("command center quick improvements", () => {
 
     const navigation = screen.getByRole("complementary", { name: "Primary navigation" });
     for (const label of ["Runs", "Devices", "Clients", "Templates", "Settings"]) {
-      const destination = within(navigation).getByText(label).closest("button");
-      expect(destination).not.toBeNull();
-      expect(destination).toHaveProperty("disabled", true);
-      expect(destination?.textContent).toMatch(/coming soon/i);
+      expect(within(navigation).queryByText(label)).toBeNull();
     }
     expect(document.querySelector(".nav-badge")).toBeNull();
 
@@ -463,7 +460,7 @@ describe("command center quick improvements", () => {
     const tiles = Array.from(container.querySelectorAll("img.map-tile"));
     expect(tiles).toHaveLength(15);
     tiles.forEach((tile) => fireEvent.error(tile));
-    expect(screen.getByRole("status").textContent).toBe("Map tiles unavailable — location pins are still accurate");
+    expect(screen.getByText("Map tiles unavailable — location pins are still accurate").getAttribute("role")).toBe("status");
   });
 
   it("uses one valid coordinate pair in phone, schedule, cycle order", () => {
