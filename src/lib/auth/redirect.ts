@@ -1,5 +1,18 @@
 const FALLBACK_ORIGIN = "https://stakeout.invalid";
 
+export function authCallbackErrorMessage(code: string | null): string | null {
+  switch (code) {
+    case "missing_code":
+      return "This sign-in link is incomplete. Request a new link from this page.";
+    case "invalid_callback":
+      return "This sign-in link could not be verified. Open it in the browser where you requested it, or request a new link.";
+    case "auth_unavailable":
+      return "Sign-in is temporarily unavailable. Please try again shortly.";
+    default:
+      return null;
+  }
+}
+
 export function safeAuthNext(value: string | null): string {
   if (
     !value ||

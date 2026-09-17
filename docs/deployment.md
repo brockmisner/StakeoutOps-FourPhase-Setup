@@ -108,27 +108,28 @@ Every listed application table should report `relrowsecurity = true`. Supabase p
 
 ## 2. Configure Supabase Auth
 
-Configure only `supabase-apricot-globe` (`mvihrrewqzvqpsufzeid`), not the unrelated `stakeout` project. In Supabase Dashboard → Authentication:
+Configure the scheduler's `supabase-amber-ferry` project (`clolvodtfzeprpktdmzc`). Its backend URL is `https://clolvodtfzeprpktdmzc.supabase.co`. In Supabase Dashboard → Authentication:
 
 1. Enable the Email provider. The UI supports both email/password and email magic-link sign-in.
-2. Set the Site URL to exactly `https://stakeout-ops.vercel.app`.
+2. Set the Site URL to exactly `https://scheduler-dashboard-production.up.railway.app`.
 3. Add the following Redirect URLs:
 
    ```text
-   https://stakeout-ops.vercel.app/auth/callback
-   https://*-brockmisner13211321-6243s-projects.vercel.app/**
-   http://localhost:3000/**
+   https://scheduler-dashboard-production.up.railway.app/auth/callback
+   https://scheduler-dashboard-production.up.railway.app/auth/callback?next=**
    ```
 
-   The exact URL is Production. The team-scoped wildcard lets the deployment that initiated a Vercel Preview login receive its own PKCE callback. Keep the localhost entry only for local development.
+   The second entry allows the app's `next` query parameter. The app restricts its value to same-site destinations. Add an exact preview callback or localhost only when that deployment needs authentication.
 4. Keep email confirmation enabled for a public-facing deployment unless there is a deliberate alternative verification flow.
-5. For an invitation-only production deployment, disable **Allow new users to sign up** and send invitations only to approved users from the Supabase dashboard.
+5. For this public-signup deployment, enable **Allow new users to sign up** and set `NEXT_PUBLIC_ALLOW_SIGNUPS=true` on the Railway dashboard service. Each account receives its own private workspace.
 6. In the Confirm signup, Invite user, and Magic link templates, keep the button link as `{{ .ConfirmationURL }}`. Do not hard-code localhost and do not use `{{ .SiteURL }}` as the action when the deployment-specific `redirectTo` must be preserved.
 7. Configure custom SMTP for Production. Supabase's default mailer is development-only and heavily restricted, so an accepted signup or magic-link request does not guarantee reliable delivery.
 
 If a message redirects to `http://localhost:3000/?code=...`, the Auth project is still falling back to its default Site URL instead of the requested `/auth/callback`. Correct the Site URL and allow list above, then request a fresh single-use email. Stakeout Ops also recognizes a code returned to the Production root and forwards it to the callback handler, but it cannot intercept a link whose host is another person's localhost.
 
-Stakeout Ops also hides public signup unless `NEXT_PUBLIC_ALLOW_SIGNUPS=true`. That UI/page gate reduces accidental exposure, but it does **not** replace disabling new-user signup in Supabase Auth: the provider setting is the authoritative server-side control. Keep both closed in production. Temporarily open both only when deliberately testing public signup.
+Stakeout Ops hides public signup unless `NEXT_PUBLIC_ALLOW_SIGNUPS=true`. Supabase's provider setting is the authoritative server-side control, so keep both settings aligned with the intended signup policy. To switch to invitation-only access later, disable both.
+
+Set Railway's `NEXT_PUBLIC_APP_URL` to the same public Site URL. Authentication callbacks return relative `Location` headers, preserving the browser's public origin even when Railway passes an internal request URL such as `https://0.0.0.0:8080`. Verify `/auth/callback` without a code returns `303` with `Location: /login?error=missing_code`.
 
 The first authenticated API request invokes `ensure_personal_workspace`, which creates the user's private organization and owner membership. Invite each approved friend separately; after signing in, they save their own DuoPlus key. Do not pre-seed shared credentials.
 

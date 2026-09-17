@@ -10,7 +10,11 @@ import {
   arePublicSignupsAllowed,
   INVITATION_REQUIRED_MESSAGE,
 } from "@/lib/auth/signup-policy";
-import { createAuthCallbackUrl, safeAuthNext } from "@/lib/auth/redirect";
+import {
+  authCallbackErrorMessage,
+  createAuthCallbackUrl,
+  safeAuthNext,
+} from "@/lib/auth/redirect";
 
 import styles from "./auth.module.css";
 
@@ -23,7 +27,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    authCallbackErrorMessage(searchParams.get("error")),
+  );
   const configured = hasSupabaseBrowserConfig();
   const publicSignupsAllowed = arePublicSignupsAllowed();
   const signupBlocked = mode === "signup" && !publicSignupsAllowed;

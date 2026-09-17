@@ -64,15 +64,14 @@ Start the app:
 npm run dev
 ```
 
-Open `http://localhost:3000` and sign in with an invited account. For local-only signup testing, set `NEXT_PUBLIC_ALLOW_SIGNUPS=true` and temporarily allow new-user signup in the Supabase Auth settings; return both controls to disabled before production. In the `supabase-apricot-globe` project (`mvihrrewqzvqpsufzeid`), set **Supabase → Authentication → URL Configuration → Site URL** to `https://stakeout-ops.vercel.app` and add these Redirect URLs:
+Open `http://localhost:3000` for local development. The live scheduler uses the `supabase-amber-ferry` project (`clolvodtfzeprpktdmzc`). Set **Supabase → Authentication → URL Configuration → Site URL** to `https://scheduler-dashboard-production.up.railway.app` and add these Redirect URLs:
 
 ```text
-https://stakeout-ops.vercel.app/auth/callback
-https://*-brockmisner13211321-6243s-projects.vercel.app/**
-http://localhost:3000/**
+https://scheduler-dashboard-production.up.railway.app/auth/callback
+https://scheduler-dashboard-production.up.railway.app/auth/callback?next=**
 ```
 
-The wildcard is for Vercel Preview deployments owned by this team; Production stays on the exact URL. If an Auth email lands on `http://localhost:3000`, Supabase is still using its default Site URL or rejected the requested Preview callback. Do not add redirect URLs to the unrelated `stakeout` Supabase project. Keep `{{ .ConfirmationURL }}` as the action link in the Confirm signup, Invite user, and Magic link email templates so Supabase can carry the requested callback through verification.
+The second entry allows the callback's `next` query parameter; the app accepts only same-site destinations. Add localhost or an exact preview callback only if that deployment needs live authentication. For public signup, enable **Allow new users to sign up** in Supabase and set `NEXT_PUBLIC_ALLOW_SIGNUPS=true` in Railway. Keep `{{ .ConfirmationURL }}` as the action link in the Confirm signup, Invite user, and Magic link email templates. The backend URL (`NEXT_PUBLIC_SUPABASE_URL`) stays `https://clolvodtfzeprpktdmzc.supabase.co`; it is different from the dashboard Site URL. The callback uses a relative redirect so Railway's internal hostname cannot become the browser destination.
 
 Supabase's built-in mailer is development-only and heavily restricted. Configure a custom SMTP provider under **Authentication → SMTP Settings** before relying on invitations or magic links in production; otherwise a successful Auth response does not guarantee prompt inbox delivery.
 
@@ -97,7 +96,7 @@ Leave the Supabase variables empty and explicitly set `NEXT_PUBLIC_DEMO_MODE=tru
 | `DISPATCH_LOOKAHEAD_MINUTES` | No | Server only | Near-term claim horizon for minute-tick mode |
 | `DISPATCH_BATCH_SIZE` | No | Server only | Maximum runs claimed by a minute tick; defaults to `20` |
 | `HORIZON_DISPATCH_BATCH_SIZE` | No | Server only | Maximum runs claimed by the daily horizon tick; defaults to `100` |
-| `NEXT_PUBLIC_APP_URL` | Recommended | Browser + server | Canonical deployed origin; set Production to `https://stakeout-ops.vercel.app` instead of copying the local example |
+| `NEXT_PUBLIC_APP_URL` | Recommended | Browser + server | Canonical deployed origin; Production is `https://scheduler-dashboard-production.up.railway.app` |
 | `NEXT_PUBLIC_ALLOW_SIGNUPS` | No | Browser + server | Defaults closed; only the exact value `true` exposes public account creation |
 | `NEXT_PUBLIC_DEMO_MODE` | No | Browser + server | Read-only preview only when Supabase server config is absent |
 

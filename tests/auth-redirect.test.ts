@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  authCallbackErrorMessage,
   createAuthCallbackUrl,
   legacyRootCodeCallback,
   safeAuthNext,
 } from "@/lib/auth/redirect";
 
 describe("Supabase Auth redirects", () => {
+  it("explains callback failures without displaying arbitrary URL content", () => {
+    expect(authCallbackErrorMessage("missing_code")).toContain("incomplete");
+    expect(authCallbackErrorMessage("invalid_callback")).toContain("browser");
+    expect(authCallbackErrorMessage("auth_unavailable")).toContain("temporarily");
+    expect(authCallbackErrorMessage("untrusted-message")).toBeNull();
+    expect(authCallbackErrorMessage(null)).toBeNull();
+  });
+
   it("builds the callback from the deployment that initiated authentication", () => {
     expect(
       createAuthCallbackUrl(
