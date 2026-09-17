@@ -34,6 +34,7 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { FleetPlanner } from "./fleet-planner";
+import { dateInZone, dayStart as planningDayStart } from "@/lib/scheduler/fleet-planning";
 
 import {
   resolvedTemplateConfigSchema,
@@ -583,7 +584,7 @@ function elapsedTime(run: CommandRun | undefined, initialNow: string) {
 
 function readableTime(value: string | null | undefined, fallback = "—") {
   if (!value) return fallback;
-  return new Date(value).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(value).toLocaleTimeString("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" });
 }
 
 function scheduleDurationHours(value: string | undefined): number {
@@ -594,7 +595,8 @@ function scheduleDurationHours(value: string | undefined): number {
 }
 
 function workloadAxisLabel(value: number): string {
-  return new Date(value).toLocaleTimeString([], {
+  return new Date(value).toLocaleTimeString("en-US", {
+    timeZone: "America/New_York",
     hour: "numeric",
     minute: "2-digit",
   });
@@ -1083,8 +1085,7 @@ export function CommandCenter({
       : 3;
   const workloadRows = useMemo<WorkloadRow[]>(() => {
     if (demo) {
-      const dayStart = new Date(workloadWindowStart);
-      dayStart.setHours(8, 0, 0, 0);
+      const dayStart = new Date(planningDayStart(dateInZone(workloadWindowStart, "America/New_York"), "America/New_York") + 8 * 3_600_000);
       const demoTasks = DEMO_TIMELINE_ROWS.map(([device, start, duration, client]) => ({
         id: `sample-${device}`,
         clientId: client,
@@ -1786,7 +1787,7 @@ export function CommandCenter({
 
         <section className="command-panel workload-panel" aria-label="Next 24 hours workload">
           <div className="command-panel-heading">
-            <div><h2>Next 24 hours</h2><span>{workerSlotCount} worker {workerSlotCount === 1 ? "slot" : "slots"} · {plannedWorkloadCount} planned {plannedWorkloadCount === 1 ? "job" : "jobs"}{occupiedWorkerCount ? ` · ${occupiedWorkerCount} occupied` : ""}</span></div>
+            <div><h2>Next 24 hours</h2><span>{workerSlotCount} worker {workerSlotCount === 1 ? "slot" : "slots"} · {plannedWorkloadCount} planned {plannedWorkloadCount === 1 ? "job" : "jobs"}{occupiedWorkerCount ? ` · ${occupiedWorkerCount} occupied` : ""} · America/New_York</span></div>
             {demo ? <button type="button" onClick={() => onNotify("The complete calendar lives in Schedules")}>View full schedule <span aria-hidden="true">→</span></button> : null}
           </div>
           <div className="workload-axis">{workloadAxis.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>

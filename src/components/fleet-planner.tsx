@@ -133,7 +133,7 @@ export function FleetPlanner(props: Props) {
     if (mode !== "day" || !timeline.current) return;
     const hours = (focusTime - selectedStart) / 3600_000;
     timeline.current.scrollLeft = Math.max(0, Math.min(hours - 1, 23)) * Math.max(480, calendarWidth - 124) / zoom;
-  }, [mode, selectedStart, focusTime, calendarWidth, zoom]);
+  }, [mode, selectedStart, focusTime, calendarWidth, zoom, loading, props.dataLoading]);
   function selectEvent(event: FleetEvent) { setSelected(event); }
   async function inspectRun() {
     if (!selected?.runId) return;
