@@ -1,0 +1,24 @@
+name: Verify scheduler
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_DEMO_MODE: "true"
+      NEXT_PUBLIC_ALLOW_SIGNUPS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.23.2"
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build -- --webpack
+      - run: npm run build:worker
+      - run: npm run typecheck
