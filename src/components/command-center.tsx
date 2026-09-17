@@ -528,7 +528,7 @@ const DEMO_TIMELINE_ROWS = [
   ["DuoPlus-03", "10.8", "2.2", "Harrison & Cole"],
   ["DuoPlus-04", "12.4", "1.9", "Lakeview Home Services"],
   ["DuoPlus-05", "9.8", "2.7", "Summit Roofing"],
-  ["DuoPlus-07", "14.0", "2.4", "CoolBreeze HVAC"],
+  ["DuoPlus-06", "14.0", "2.4", "CoolBreeze HVAC"],
 ] as const;
 
 function stageFromRun(run: CommandRun) {
@@ -926,7 +926,7 @@ export function CommandCenter({
     if (demo) {
       return schedules.map((schedule, index): Operation => {
         const run = runMap.get(schedule.id);
-        const [stage, tone, progress, elapsed] = DEMO_STAGES[index % DEMO_STAGES.length];
+        const [stage, tone, progress, elapsed] = DEMO_STAGES[index < 2 ? index : index === 2 ? 4 : index < 6 ? 5 : 6];
         return { id: schedule.id, schedule, run, sample: true, stage, tone, progress, elapsed };
       });
     }
@@ -1000,17 +1000,12 @@ export function CommandCenter({
     ),
     [clientFilter, deviceFilter, operations],
   );
-  const liveCounts = useMemo(() => demo ? {
-    due: 4,
-    running: 7,
-    queued: 12,
-    attention: 3,
-  } : {
+  const liveCounts = useMemo(() => { return {
     due: metricOperations.filter((operation) => operationStageMatches(operation, "Due now", nowIso)).length,
     running: metricOperations.filter((operation) => operationStageMatches(operation, "Running", nowIso)).length,
     queued: metricOperations.filter((operation) => operationStageMatches(operation, "Queued", nowIso)).length,
     attention: metricOperations.filter((operation) => operationStageMatches(operation, "Needs attention", nowIso)).length,
-  }, [demo, metricOperations, nowIso]);
+  }; }, [metricOperations, nowIso]);
 
   const uniqueDevices = useMemo(
     () => Array.from(new Set([
@@ -1040,11 +1035,11 @@ export function CommandCenter({
       return summary;
     }, { total: 0, new: 0, warming: 0, ready: 0, completed: 0, needsAttention: 0 });
   }, [clientFilter, clientProfiles, profileSummary]);
-  const online = demo ? 18 : phones.filter((phone) => phone.enabled && phone.status === 1).length;
-  const busy = demo ? 4 : phones.filter((phone) => phone.status === 1 && Boolean(phone.busyUntil) && new Date(phone.busyUntil as string).getTime() > nowMs).length;
-  const powering = demo ? 2 : phones.filter((phone) => [10, 11].includes(phone.status)).length;
-  const offline = demo ? 6 : phones.filter((phone) => !phone.enabled || [0, 2, 3, 4, 12].includes(phone.status)).length;
-  const idle = demo ? 7 : Math.max(0, online - busy);
+  const online = demo ? 3 : phones.filter((phone) => phone.enabled && phone.status === 1).length;
+  const busy = demo ? 3 : phones.filter((phone) => phone.status === 1 && Boolean(phone.busyUntil) && new Date(phone.busyUntil as string).getTime() > nowMs).length;
+  const powering = demo ? 0 : phones.filter((phone) => [10, 11].includes(phone.status)).length;
+  const offline = demo ? 47 : phones.filter((phone) => !phone.enabled || [0, 2, 3, 4, 12].includes(phone.status)).length;
+  const idle = demo ? 0 : Math.max(0, online - busy);
   const visibleDevices = devices.slice(0, 6);
   const completedRuns = runs
     .filter((run) => run.status === "succeeded")
@@ -1055,9 +1050,9 @@ export function CommandCenter({
         schedule: displayScheduleForRun(run, schedulesById),
         run,
       }));
-  const subscriptionLimit = demo ? 24 : subscriptionCapacity ?? null;
-  const subscriptionUsed = demo ? 18 : subscriptionInUse ?? null;
-  const subscriptionFree = demo ? 6 : subscriptionAvailable ?? null;
+  const subscriptionLimit = demo ? 3 : subscriptionCapacity ?? null;
+  const subscriptionUsed = demo ? 3 : subscriptionInUse ?? null;
+  const subscriptionFree = demo ? 0 : subscriptionAvailable ?? null;
   const subscriptionPercent = subscriptionLimit && subscriptionUsed != null
     ? Math.min(100, Math.round((subscriptionUsed / subscriptionLimit) * 100))
     : 0;
@@ -1466,7 +1461,7 @@ export function CommandCenter({
       <div className="command-heading">
         <div>
           <h1>Command center</h1>
-          <p>Monitor today&apos;s DuoPlus operations.</p>
+          <p>{demo ? "Sample workspace · 10 clients · 50 phones · 250 daily tasks · 3 Startup slots." : "Monitor today’s DuoPlus operations."}</p>
         </div>
         <div className="command-heading-actions">
           <label className="command-select">
@@ -1620,7 +1615,7 @@ export function CommandCenter({
             </label>
           </div>
 
-          <div className="command-table-scroll" aria-busy={loading}>
+          <div className="command-table-scroll" aria-busy={loading} style={demo ? { maxHeight: 580, overflowY: "auto" } : undefined}>
             <table className="command-table">
               <thead><tr><th>Client</th><th>Keyword</th><th>Phone</th><th>Current stage</th><th>Progress</th><th>Elapsed</th><th>Action</th></tr></thead>
               <tbody>
@@ -1759,7 +1754,7 @@ export function CommandCenter({
 
       <div className="command-secondary-grid">
         <section className="command-panel command-capacity" aria-label="Device capacity overview">
-          <div className="command-panel-heading"><h2>Device capacity</h2><span>{online} / {demo ? 24 : phones.length} online</span>{demo ? <button type="button" onClick={() => onNotify("Device inventory is available from Schedules and DuoPlus setup")}>View all devices <span aria-hidden="true">→</span></button> : <span>{phones.length} synced devices</span>}</div>
+          <div className="command-panel-heading"><h2>Device capacity</h2><span>{online} / {phones.length} online</span>{demo ? <button type="button" onClick={() => onNotify("Device inventory is available from Schedules and DuoPlus setup")}>View all devices <span aria-hidden="true">→</span></button> : <span>{phones.length} synced devices</span>}</div>
           <div className="capacity-stats">
             <CapacityStat label="Online" value={online} tone="green" />
             <CapacityStat label="Busy" value={busy} tone="blue" />
@@ -1775,7 +1770,7 @@ export function CommandCenter({
         <section className="command-panel workload-panel" aria-label="Next 24 hours workload">
           <div className="command-panel-heading">
             <div><h2>Next 24 hours</h2><span>{workerSlotCount} worker {workerSlotCount === 1 ? "slot" : "slots"} · {plannedWorkloadCount} planned {plannedWorkloadCount === 1 ? "job" : "jobs"}{occupiedWorkerCount ? ` · ${occupiedWorkerCount} occupied` : ""}</span></div>
-            {demo ? <button type="button" onClick={() => onNotify("The complete calendar lives in Schedules")}>View full schedule <span aria-hidden="true">→</span></button> : null}
+            {demo ? <button type="button" onClick={() => onNotify("This sample timeline illustrates how six jobs share three slots. Open Schedules to inspect all 250 recurring tasks.")}>View full schedule <span aria-hidden="true">→</span></button> : null}
           </div>
           <div className="workload-axis">{workloadAxis.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>
           <div className="workload-grid">

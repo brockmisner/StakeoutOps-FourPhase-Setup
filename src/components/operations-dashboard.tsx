@@ -249,7 +249,7 @@ const DEMO_MODE =
   process.env.NEXT_PUBLIC_DEMO_MODE === "true" &&
   !hasSupabaseBrowserConfig();
 
-const INITIAL_SCHEDULES: Schedule[] = [
+const SAMPLE_SCHEDULE_TEMPLATES: Schedule[] = [
   {
     id: "sch_01",
     title: "Car accident lawyer — downtown",
@@ -412,14 +412,11 @@ const INITIAL_SCHEDULES: Schedule[] = [
   },
 ];
 
-const DEVICES = [
-  { name: "DuoPlus-01", status: "Online", detail: "Idle" },
-  { name: "DuoPlus-02", status: "Online", detail: "Busy until 11:32 AM" },
-  { name: "DuoPlus-03", status: "Online", detail: "Busy until 10:42 AM" },
-  { name: "DuoPlus-04", status: "Online", detail: "Idle" },
-  { name: "DuoPlus-05", status: "Offline", detail: "—" },
-  { name: "DuoPlus-07", status: "Online", detail: "Busy until 11:15 AM" },
-];
+const DEVICES = Array.from({ length: 50 }, (_, index) => ({
+  name: `DuoPlus-${String(index + 1).padStart(2, "0")}`,
+  status: index < 3 ? "Online" : "Offline",
+  detail: index < 3 ? "Busy · sample task" : "Waiting for a Startup slot",
+}));
 
 const CLIENTS = [
   "Metro Plumbing Co.",
@@ -428,25 +425,60 @@ const CLIENTS = [
   "Harrison & Cole",
   "CoolBreeze HVAC",
   "Lakeview Home Services",
+  "Oak & Pine Dental",
+  "Harbor Auto Care",
+  "Evergreen Landscaping",
+  "Brightside Electric",
 ];
+
+// Preserve the four example cycle assignments, then fill each client to five phones.
+const DEMO_PHONE_CLIENTS = (() => {
+  const assigned = [2, 1, 4, 6, 3, 5];
+  for (let client = 1; client <= 10; client += 1) {
+    while (assigned.filter(value => value === client).length < 5) assigned.push(client);
+  }
+  return assigned;
+})();
 
 const DEMO_CLIENT_RECORDS: ClientRecord[] = CLIENTS.map((name, index) => ({ id: `demo-client-${index + 1}`, name }));
 const DEMO_PHONE_RECORDS: PhoneRecord[] = DEVICES.map((device, index) => ({
   id: `demo-phone-${index + 1}`,
-  clientId: [`demo-client-2`, `demo-client-1`, `demo-client-4`, `demo-client-6`, `demo-client-3`, `demo-client-5`][index] ?? null,
+  clientId: `demo-client-${DEMO_PHONE_CLIENTS[index]}`,
   imageId: `DEMO${String(index + 1).padStart(2, "0")}`,
   name: device.name,
   status: device.status === "Online" ? 1 : 2,
   enabled: true,
   busyUntil: null,
-  gpsLatitude: [28.0748, 28.026, 28.008, 28.049, 28.062, 28.019][index],
-  gpsLongitude: [-81.956, -81.902, -81.949, -81.884, -81.925, -81.985][index],
+  gpsLatitude: [28.0748, 28.026, 28.008, 28.049, 28.062, 28.019][index % 6],
+  gpsLongitude: [-81.956, -81.902, -81.949, -81.884, -81.925, -81.985][index % 6],
 }));
 const DEMO_TEMPLATE_RECORDS: TemplateRecord[] = [
   { id: "demo-template-standard", templateType: 2, templateSource: "custom", name: "Local Search — Standard", enabled: true },
   { id: "demo-template-deep", templateType: 2, templateSource: "custom", name: "Local Search — Deep Scan", enabled: true },
   { id: "demo-template-maps", templateType: 1, templateSource: "official", name: "Maps — Finder Scan", enabled: true },
 ];
+
+const INITIAL_SCHEDULES: Schedule[] = Array.from({ length: 250 }, (_, index) => {
+  const phoneIndex = index % 50;
+  const phone = DEMO_PHONE_RECORDS[phoneIndex];
+  const taskNumber = Math.floor(index / 50) + 1;
+  const clientIndex = DEMO_PHONE_CLIENTS[phoneIndex] - 1;
+  const source = SAMPLE_SCHEDULE_TEMPLATES.find(item => item.client === CLIENTS[clientIndex]) ?? SAMPLE_SCHEDULE_TEMPLATES[1];
+  return {
+    ...source,
+    id: `sch_${String(index + 1).padStart(2, "0")}`,
+    clientId: phone.clientId ?? undefined,
+    phoneId: phone.id,
+    templateId: "demo-template-standard",
+    title: `${source.title} · Task ${taskNumber}`,
+    client: CLIENTS[clientIndex],
+    device: phone.name,
+    cadence: "Daily",
+    duration: "10 minutes",
+    status: index < 3 ? "Running" : index < 6 ? "Needs attention" : "Queued",
+    nextRun: index < 3 ? "Running now" : "Waiting for a Startup slot",
+  };
+});
 
 const DEMO_CYCLE_PROGRAMS: CycleProgramOption[] = [
   { id: "demo-cycle-program-30", name: "30-day local presence", durationDays: 30, timezone: "America/New_York", status: "published", readyDay: 10, readyThresholdPercent: 80, completionThresholdPercent: 90, rules: [] },
@@ -1098,9 +1130,9 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
     });
   }, [cadenceFilter, clientFilter, query, schedules, statusFilter]);
 
-  const runningCount = DEMO_MODE ? 6 : recentRuns.filter((run) => ["preparing", "running"].includes(run.status)).length;
+  const runningCount = DEMO_MODE ? 3 : recentRuns.filter((run) => ["preparing", "running"].includes(run.status)).length;
   const dashboardNowMs = new Date(initialNow).getTime();
-  const dueNowCount = DEMO_MODE ? 4 : recentRuns.filter((run) =>
+  const dueNowCount = DEMO_MODE ? 0 : recentRuns.filter((run) =>
     ["pending", "queued", "retry_wait"].includes(run.status)
     && new Date(run.issueAt).getTime() <= dashboardNowMs,
   ).length;
@@ -1116,8 +1148,8 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
       ? `${((finishedRuns.filter((run) => run.status === "succeeded").length / finishedRuns.length) * 100).toFixed(1)}%`
       : "—";
   const onlinePhoneCount = schedulablePhones.filter((phone) => phone.status === 1).length;
-  const subscriptionLimit = DEMO_MODE ? 24 : integration.subscriptionCapacity;
-  const subscriptionUsed = DEMO_MODE ? 18 : integration.subscriptionInUse ?? onlinePhoneCount;
+  const subscriptionLimit = DEMO_MODE ? 3 : integration.subscriptionCapacity;
+  const subscriptionUsed = DEMO_MODE ? 3 : integration.subscriptionInUse ?? onlinePhoneCount;
   const capacityValue = subscriptionLimit == null ? `${subscriptionUsed} / sync` : `${subscriptionUsed} / ${subscriptionLimit}`;
   const capacityPercent = subscriptionLimit
     ? Math.min(100, Math.round((subscriptionUsed / subscriptionLimit) * 100))
@@ -1808,7 +1840,7 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
               <span className="setup-banner-icon"><KeyRound size={17} /></span>
               <span>
                 <strong>{DEMO_MODE ? "Read-only sample workspace" : "Connect DuoPlus to start"}</strong>
-                <small>{DEMO_MODE ? "Sample records are clearly marked and cannot be changed." : "Connect your own DuoPlus account to sync phones and start dispatching."}</small>
+                <small>{DEMO_MODE ? "10 sample clients · 50 phones · 250 daily tasks · 3 Startup slots. Explore filters and schedule details." : "Connect your own DuoPlus account to sync phones and start dispatching."}</small>
               </span>
               <span className="setup-banner-action">{DEMO_MODE ? "Why it is read-only" : "Connect DuoPlus"} <span aria-hidden="true">→</span></span>
             </button>
@@ -1892,7 +1924,7 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
               </div>
             ) : null}
 
-            <div className="table-scroll" aria-busy={dashboardLoading}>
+            <div className="table-scroll" aria-busy={dashboardLoading} style={DEMO_MODE ? { maxHeight: 640, overflowY: "auto" } : undefined}>
               {dashboardLoading ? (
                 <div className="loading-state" role="status"><RefreshCw className="spin" size={18} /><span>Loading your workspace…</span></div>
               ) : null}
