@@ -387,7 +387,7 @@ describe("command center quick improvements", () => {
 
     const slots = screen.getAllByLabelText(/Worker slot \d/);
     expect(slots).toHaveLength(3);
-    expect(screen.getByText("3 worker slots · 4 planned jobs")).toBeTruthy();
+    expect(screen.getByText("3 worker slots · 4 planned jobs · America/New_York")).toBeTruthy();
     expect(document.querySelectorAll(".workload-block.is-current")).toHaveLength(3);
     const fourthJob = screen.getByRole("button", { name: /Phone 4, Beacon, starts/i });
     // Current RPA duration starts after phone preparation, so the lane keeps
@@ -429,7 +429,7 @@ describe("command center quick improvements", () => {
       onNotify,
     })));
 
-    expect(screen.getByText("3 worker slots · 0 planned jobs · 1 occupied")).toBeTruthy();
+    expect(screen.getByText("3 worker slots · 0 planned jobs · 1 occupied · America/New_York")).toBeTruthy();
     const occupied = screen.getByRole("button", {
       name: "Phone 1, Startup slot occupied without an active run",
     });
