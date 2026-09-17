@@ -98,7 +98,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         email,
         options: {
           emailRedirectTo: createAuthCallbackUrl(window.location.origin, next),
-          shouldCreateUser: mode === "signup",
+          shouldCreateUser: publicSignupsAllowed,
         },
       });
       if (authError) throw authError;
