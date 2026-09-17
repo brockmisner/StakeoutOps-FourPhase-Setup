@@ -924,7 +924,7 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
     }
     try {
       const [scheduleData, clientData] = await Promise.all([
-        apiRequest<{ schedules: ApiSchedule[] }>("/api/schedules"),
+        apiRequest<{ schedules: ApiSchedule[] }>("/api/schedules?limit=500"),
         apiRequest<{ clients: ClientRecord[] }>("/api/clients"),
       ]);
       const [phoneResult, templateResult, runResult, integrationResult, cycleResult, programResult, profileResult] = await Promise.allSettled([
@@ -2001,6 +2001,7 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
             subscriptionSyncedAt={integration.subscriptionSyncedAt}
             successRate={successRate}
             initialNow={initialNow}
+            onAddSchedule={() => { setActiveView("schedules"); openAddDrawer(); }}
             onRefresh={() => {
               if (DEMO_MODE) {
                 setSchedules(INITIAL_SCHEDULES);
@@ -2149,7 +2150,7 @@ function Sidebar({
         <button className="icon-button sidebar-close" type="button" onClick={onClose} aria-label="Close navigation"><X size={18} /></button>
       </div>
       <nav>
-        {NAVIGATION.map((item) => {
+        {NAVIGATION.filter((item) => item.enabled).map((item) => {
           const Icon = item.icon;
           const destination = item.view;
           const active = item.enabled && destination === activeView;
@@ -3445,3 +3446,4 @@ function ConfirmDialog({ schedule, onCancel, onConfirm }: { schedule: Schedule; 
     </div>
   );
 }
+

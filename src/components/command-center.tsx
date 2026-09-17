@@ -33,6 +33,8 @@ import {
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { FleetPlanner } from "./fleet-planner";
+
 import {
   resolvedTemplateConfigSchema,
   type DuoPlusTemplateConfigSchema,
@@ -471,6 +473,7 @@ type CommandCenterProps = {
   successRate: string;
   initialNow: string;
   onRefresh: () => void;
+  onAddSchedule?: () => void;
   onRun: (scheduleId: string) => void;
   onViewSchedule: (scheduleId: string) => void;
   onViewRun: (run: CommandRun) => void;
@@ -867,6 +870,7 @@ export function CommandCenter({
   successRate,
   initialNow,
   onRefresh,
+  onAddSchedule,
   onRun,
   onViewSchedule,
   onViewRun,
@@ -876,6 +880,8 @@ export function CommandCenter({
   onSetCycleStatus,
   onNotify,
 }: CommandCenterProps) {
+  const [panel, setPanel] = useState("schedule");
+  const [plannerRefresh, setPlannerRefresh] = useState(0);
   const [clientFilter, setClientFilter] = useState("All clients");
   const [stageFilter, setStageFilter] = useState("All stages");
   const [deviceFilter, setDeviceFilter] = useState("All devices");
@@ -1462,13 +1468,14 @@ export function CommandCenter({
   }
 
   return (
-    <section className="workspace-inner command-center" aria-label="Command center dashboard">
+    <section className="workspace-inner command-center" data-panel={panel} aria-label="Command center dashboard">
       <div className="command-heading">
         <div>
-          <h1>Command center</h1>
-          <p>Monitor today&apos;s DuoPlus operations.</p>
+          <h1>Fleet command center</h1>
+          <p>Every client. Every device. A clear plan.</p>
         </div>
         <div className="command-heading-actions">
+          {onAddSchedule ? <button className="primary-button fleet-add-schedule" onClick={onAddSchedule}><Plus size={17} /> Add schedule</button> : null}
           <label className="command-select">
             <span className="sr-only">Filter command center by client</span>
             <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} aria-label="Filter command center by client">
@@ -1477,7 +1484,7 @@ export function CommandCenter({
             </select>
             <ChevronDown size={15} aria-hidden="true" />
           </label>
-          <button className="icon-button command-refresh" type="button" onClick={onRefresh} aria-label="Refresh command center">
+          <button className="icon-button command-refresh" type="button" onClick={() => { onRefresh(); setPlannerRefresh(v => v + 1); }} aria-label="Refresh command center">
             <RefreshCw size={17} className={loading ? "spin" : ""} />
           </button>
           <div className="quick-run-wrap">
@@ -1534,6 +1541,11 @@ export function CommandCenter({
           </div>
         </div>
       </div>
+
+      <div className="fleet-tabs" role="tablist" aria-label="Command center views">
+        {[["schedule", "Schedule"], ["operations", "Operations"], ["cycles", "Cycles & readiness"], ["map", "Device map"]].map(([key,label]) => <button type="button" role="tab" key={key} aria-selected={panel === key} onClick={() => setPanel(key)}>{label}</button>)}
+      </div>
+      {panel === "schedule" ? <FleetPlanner refreshToken={plannerRefresh} phones={phones} clients={clientOptions} cycles={cycles} schedules={schedules} templates={templateOptions} capacity={subscriptionCapacity ?? null} used={subscriptionInUse ?? null} demo={demo} initialNow={initialNow} connected={integrationConnected} dataLoading={loading} onViewSchedule={onViewSchedule} onViewRun={onViewRun} onOpenIntegration={onOpenIntegration} onNotify={onNotify} /> : null}
 
       <div className="health-strip" aria-label="System health">
         <span className={demo ? "health-warn" : integrationConnected ? "health-ok" : "health-error"}><i />{demo ? "Sample data — DuoPlus disconnected" : integrationConnected ? "DuoPlus connected" : "DuoPlus disconnected"}</span>
@@ -3070,3 +3082,4 @@ function CommandDevice({ device, index, sample, assignment }: { device: DeviceDi
       : assignment ?? (online ? device.detail || "Idle" : "No assignment");
   return <article className="command-device"><Smartphone size={16} /><div><strong>{device.name}</strong><span className={online ? busy ? "device-busy" : "device-online" : "device-offline"}><i />{online ? busy ? "Busy" : "Online" : "Offline"}</span><small>{detail}</small></div></article>;
 }
+
