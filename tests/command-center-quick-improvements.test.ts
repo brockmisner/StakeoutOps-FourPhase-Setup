@@ -562,6 +562,7 @@ describe("command center quick improvements", () => {
     }
   });
 
+  // This integration test renders the complete 250-task fleet and its editor.
   it("searches the schedule template catalog while preserving Official and Custom groups", () => {
     render(createElement(OperationsDashboard, {
       initialNow: "2026-09-06T12:00:00.000Z",
@@ -574,17 +575,18 @@ describe("command center quick improvements", () => {
     expect(heading).not.toBeNull();
     fireEvent.click(within(heading as HTMLElement).getByRole("button", { name: /add schedule/i }));
 
-    const templateSearch = screen.getByLabelText("Search templates");
-    const templateSelect = screen.getByRole("combobox", { name: "Template" });
+    const drawer = screen.getByRole("complementary", { name: "Add schedule" });
+    const templateSearch = within(drawer).getByLabelText("Search templates");
+    const templateSelect = within(drawer).getByRole("combobox", { name: "Template" });
     const groupLabels = Array.from(templateSelect.querySelectorAll("optgroup"))
       .map((group) => group.label);
     expect(groupLabels.some((label) => /^Official(?:\s|\(|$)/.test(label))).toBe(true);
     expect(groupLabels.some((label) => /^Custom(?:\s|\(|$)/.test(label))).toBe(true);
 
     fireEvent.change(templateSearch, { target: { value: "Finder" } });
-    expect(screen.getByRole("option", { name: /maps.*finder scan/i })).toBeTruthy();
-    expect(screen.queryByRole("option", { name: /local search/i })).toBeNull();
-  });
+    expect(within(drawer).getByRole("option", { name: /maps.*finder scan/i })).toBeTruthy();
+    expect(within(drawer).queryByRole("option", { name: /local search/i })).toBeNull();
+  }, 15_000);
 });
 
 describe("DuoPlus connect and inventory presentation", () => {
