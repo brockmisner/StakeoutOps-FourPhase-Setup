@@ -783,7 +783,8 @@ describe("fleet map viewport", () => {
         }],
       })));
       const leftEdges = Array.from(container.querySelectorAll<HTMLImageElement>(".map-tile"))
-        .map((tile) => 720 + Number(tile.style.left.match(/\+ ([-\d.]+)px/)?.[1]));
+        .map((tile) => 720 + Number(tile.style.left
+          .replace("calc(50%", "").replace("px)", "").replaceAll(" ", "").replace("+-", "-")));
       expect(Math.min(...leftEdges)).toBeLessThanOrEqual(0);
       expect(Math.max(...leftEdges) + 256).toBeGreaterThanOrEqual(1440);
     } finally {
