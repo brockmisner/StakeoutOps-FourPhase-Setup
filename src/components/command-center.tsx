@@ -2876,8 +2876,12 @@ function DeviceLocationMap({
   const scaleTiles = 2 ** zoom;
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
-  const tiles = [-2, -1, 0, 1, 2].flatMap((offsetX) =>
-    [-1, 0, 1].map((offsetY) => {
+  const tileRadiusX = Math.ceil(mapSize.width / 512);
+  const tileRadiusY = Math.ceil(mapSize.height / 512);
+  const tileOffsetsX = Array.from({ length: tileRadiusX * 2 + 1 }, (_, index) => index - tileRadiusX);
+  const tileOffsetsY = Array.from({ length: tileRadiusY * 2 + 1 }, (_, index) => index - tileRadiusY);
+  const tiles = tileOffsetsX.flatMap((offsetX) =>
+    tileOffsetsY.map((offsetY) => {
       const rawX = centerTileX + offsetX;
       const rawY = centerTileY + offsetY;
       const tileX = ((rawX % scaleTiles) + scaleTiles) % scaleTiles;

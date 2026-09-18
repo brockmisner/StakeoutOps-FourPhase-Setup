@@ -60,7 +60,7 @@ The first production work should address complete run counts, stale-state visibi
 
 **Verification and remaining checks**
 
-New regression coverage checks the Schedules navigation, all 50 phone markers across six groups, five-phone client filtering, matching Running filtering, nine separately selectable phones at the same coordinate, unchanged saved location values, map-fit controls, and device setup navigation.
+New regression coverage checks the Schedules navigation, all 50 phone markers across six groups, five-phone client filtering, matching Running filtering, nine separately selectable phones at the same coordinate, unchanged saved location values, map-fit controls, wide-viewport tile coverage, and device setup navigation.
 
 The existing baseline CI run had a five-second timeout in a full-dashboard UI test. Full-page button searches became expensive with 250 rows. Related test queries were scoped to the navigation or heading while retaining their assertions and original time limits. [Branch checks](https://github.com/brockmisner/StakeoutOps-FourPhase-Setup/actions?query=branch%3Afix%2Fdemo-schedules-map).
 

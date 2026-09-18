@@ -753,3 +753,39 @@ describe("schedule fleet map parity", () => {
     expect(onOpenIntegration).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("fleet map viewport", () => {
+  it("covers a wide schedule map with tiles after the viewport is measured", () => {
+    const previousObserver = globalThis.ResizeObserver;
+    vi.stubGlobal("ResizeObserver", class {
+      callback: (entries: Array<{ contentRect: { width: number; height: number } }>) => void;
+      constructor(callback: (entries: Array<{ contentRect: { width: number; height: number } }>) => void) {
+        this.callback = callback;
+      }
+      observe() {
+        this.callback([{ contentRect: { width: 1440, height: 360 } }]);
+      }
+      disconnect() { return undefined; }
+    });
+    try {
+      const { container } = render(createElement(CommandCenter, commandCenterProps({
+        schedules: schedules(1),
+        runs: [],
+        phones: [{
+          id: "phone-1",
+          name: "Phone 1",
+          enabled: true,
+          status: 2,
+          gpsLatitude: 40,
+          gpsLongitude: -71,
+        }],
+      })));
+      const leftEdges = Array.from(container.querySelectorAll<HTMLImageElement>(".map-tile"))
+        .map((tile) => 720 + Number(tile.style.left.match(/\+ ([-\d.]+)px/)?.[1]));
+      expect(Math.min(...leftEdges)).toBeLessThanOrEqual(0);
+      expect(Math.max(...leftEdges) + 256).toBeGreaterThanOrEqual(1440);
+    } finally {
+      vi.stubGlobal("ResizeObserver", previousObserver);
+    }
+  });
+});
