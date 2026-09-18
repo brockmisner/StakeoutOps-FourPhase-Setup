@@ -670,3 +670,83 @@ describe("DuoPlus connect and inventory presentation", () => {
     expect(source).toMatch(/\{selectedRunDetail \? \([\s\S]*?<RunLogDialog[\s\S]*?run=\{selectedRunDetail\}/);
   });
 });
+
+describe("schedule fleet map parity", () => {
+  it("opens the full schedule with all 50 phone pins in six groups and filters them with the table", () => {
+    const { container } = render(createElement(OperationsDashboard, {
+      initialNow: "2026-09-18T12:00:00.000Z",
+      systemReady: false,
+    }));
+
+    fireEvent.click(screen.getByRole("button", { name: /View full schedule/i }));
+    expect(screen.getByRole("heading", { level: 1, name: "Schedules" })).toBeTruthy();
+    const panel = screen.getByRole("region", { name: "Device location map" });
+    let pins = Array.from(panel.querySelectorAll<HTMLButtonElement>(".map-device-pin"));
+    expect(pins).toHaveLength(50);
+    const locations = new Set(pins.map((pin) => pin.style.left + ":" + pin.style.top));
+    expect(locations.size).toBe(6);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by client" }), {
+      target: { value: "Metro Plumbing Co." },
+    });
+    pins = Array.from(panel.querySelectorAll<HTMLButtonElement>(".map-device-pin"));
+    expect(pins).toHaveLength(5);
+    expect(pins.every((pin) => pin.getAttribute("aria-label")?.includes("Metro Plumbing Co."))).toBe(true);
+    expect(container.querySelectorAll(".schedule-table tbody > tr.schedule-row")).toHaveLength(25);
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Zoom in" }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Fit all devices" }));
+    expect(panel.querySelectorAll(".map-device-pin")).toHaveLength(5);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Filter by status" }), {
+      target: { value: "Running" },
+    });
+    expect(panel.querySelectorAll(".map-device-pin")).toHaveLength(1);
+    expect(container.querySelectorAll(".schedule-table tbody > tr.schedule-row")).toHaveLength(1);
+  }, 20_000);
+
+  it("keeps nine phones at one coordinate separately selectable without changing their saved location", () => {
+    const phones = Array.from({ length: 9 }, (_, index) => ({
+      id: `phone-${index + 1}`,
+      clientId: "client-acme",
+      name: `Phone ${index + 1}`,
+      enabled: true,
+      status: 2,
+      gpsLatitude: 40,
+      gpsLongitude: -71,
+    }));
+    const { container } = render(createElement(CommandCenter, commandCenterProps({
+      schedules: schedules(9),
+      runs: [],
+      phones,
+    })));
+    const panel = screen.getByRole("region", { name: "Device location map" });
+    const pins = Array.from(panel.querySelectorAll<HTMLButtonElement>(".map-device-pin"));
+    expect(pins).toHaveLength(9);
+    const offsets = pins.map((pin) => ({
+      x: Number.parseFloat(pin.style.getPropertyValue("--map-pin-offset-x")),
+      y: Number.parseFloat(pin.style.getPropertyValue("--map-pin-offset-y")),
+    }));
+    for (let i = 0; i < offsets.length; i += 1) {
+      for (let j = i + 1; j < offsets.length; j += 1) {
+        expect(Math.hypot(offsets[i].x - offsets[j].x, offsets[i].y - offsets[j].y)).toBeGreaterThan(33);
+      }
+    }
+    fireEvent.click(within(panel).getByRole("button", { name: "Close device details" }));
+    for (let index = 0; index < pins.length; index += 1) {
+      fireEvent.click(pins[index]);
+      expect(container.querySelector(".map-popover strong")?.textContent).toBe(`Phone ${index + 1}`);
+      expect(within(panel).getByText("Saved phone GPS · 40.0000, -71.0000")).toBeTruthy();
+    }
+  });
+
+  it("opens device setup from View all devices", () => {
+    const onOpenIntegration = vi.fn();
+    render(createElement(CommandCenter, commandCenterProps({
+      demo: true,
+      onOpenIntegration,
+    })));
+    fireEvent.click(screen.getByRole("button", { name: /View all devices/i }));
+    expect(onOpenIntegration).toHaveBeenCalledTimes(1);
+  });
+});

@@ -473,6 +473,7 @@ type CommandCenterProps = {
   onRefresh: () => void;
   onRun: (scheduleId: string) => void;
   onViewSchedule: (scheduleId: string) => void;
+  onOpenSchedules?: () => void;
   onViewRun: (run: CommandRun) => void;
   onOpenIntegration: () => void;
   onLaunchCycle: (input: LaunchCycleInput) => Promise<void> | void;
@@ -794,13 +795,14 @@ function mapMarkerOffset(
   points: MapPoint[],
   targets: MapTarget[],
 ) {
+  const overlapping = points.filter((candidate) => coordinatesMatch(point, candidate));
   const targetOverlap = targets.some((target) => coordinatesMatch(point, target));
-  const earlierDeviceOverlaps = points
-    .slice(0, pointIndex)
-    .filter((candidate) => coordinatesMatch(point, candidate)).length;
-  if (!targetOverlap && earlierDeviceOverlaps === 0) return { x: 0, y: 0 };
-  const angle = (-45 + earlierDeviceOverlaps * 55) * (Math.PI / 180);
-  const radius = targetOverlap ? 16 : 12;
+  if (overlapping.length < 2 && !targetOverlap) return { x: 0, y: 0 };
+  const index = overlapping.findIndex((candidate) => candidate.id === points[pointIndex].id);
+  // Keep a separate hit target for every phone at the same saved coordinate.
+  // These are display offsets only; the stored GPS values never change.
+  const radius = Math.max(32, overlapping.length * 36 / (2 * Math.PI));
+  const angle = (-45 + index * 360 / overlapping.length) * (Math.PI / 180);
   return {
     x: Math.round(Math.cos(angle) * radius),
     y: Math.round(Math.sin(angle) * radius),
@@ -813,22 +815,19 @@ function locationSourceLabel(source: MapPoint["locationSource"]) {
   return "Cycle target fallback";
 }
 
-function mapZoomFor(points: Array<{ latitude: number; longitude: number }>) {
+function mapZoomFor(
+  points: Array<{ latitude: number; longitude: number }>,
+  width = 640,
+  height = 360,
+) {
   if (points.length < 2) return 12;
-  const latitudes = points.map((point) => point.latitude);
-  const longitudes = points.map((point) => point.longitude);
-  const span = Math.max(
-    Math.max(...latitudes) - Math.min(...latitudes),
-    Math.max(...longitudes) - Math.min(...longitudes),
-  );
-  if (span > 12) return 4;
-  if (span > 5) return 5;
-  if (span > 2) return 6;
-  if (span > 0.8) return 7;
-  if (span > 0.3) return 8;
-  if (span > 0.14) return 9;
-  if (span > 0.07) return 10;
-  return 12;
+  const projected = points.map((point) => mercatorPoint(point.latitude, point.longitude, 0));
+  const spanX = Math.max(...projected.map((point) => point.x)) - Math.min(...projected.map((point) => point.x));
+  const spanY = Math.max(...projected.map((point) => point.y)) - Math.min(...projected.map((point) => point.y));
+  if (spanX === 0 && spanY === 0) return 12;
+  const scaleX = spanX ? Math.max(1, width - 128) / spanX : Number.POSITIVE_INFINITY;
+  const scaleY = spanY ? Math.max(1, height - 128) / spanY : Number.POSITIVE_INFINITY;
+  return Math.max(1, Math.min(17, Math.floor(Math.log2(Math.min(scaleX, scaleY)))));
 }
 
 function mercatorPoint(latitude: number, longitude: number, zoom: number) {
@@ -869,6 +868,7 @@ export function CommandCenter({
   onRefresh,
   onRun,
   onViewSchedule,
+  onOpenSchedules,
   onViewRun,
   onOpenIntegration,
   onLaunchCycle,
@@ -1351,84 +1351,6 @@ export function CommandCenter({
   }, [clientNameById, phones, schedules]);
   const externalProxyCycles = proxySummary?.preconfiguredAssignments
     ?? filteredCycles.filter((cycle) => usesExternalDeviceProxy(cycle)).length;
-  const mapPoints = useMemo<MapPoint[]>(() => {
-    const cycleByPhone = new Map(filteredCycles.map((cycle) => [cycle.phoneId, cycle]));
-    const clientById = new Map(clientOptions.map((client) => [client.id, client.name]));
-    return phones.flatMap((phone) => {
-      const cycle = cycleByPhone.get(phone.id);
-      const assignedSchedules = schedules.filter((item) =>
-        item.phoneId === phone.id || item.device === phone.name,
-      );
-      const schedule = assignedSchedules[0];
-      const scheduleWithLocation = assignedSchedules.find((item) =>
-        coordinatePair(item.gpsLatitude, item.gpsLongitude) != null,
-      );
-      const client = cycle?.clientName
-        ?? (phone.clientId ? clientById.get(phone.clientId) : undefined)
-        ?? schedule?.client
-        ?? "Unassigned";
-      if (clientFilter !== "All clients" && client !== clientFilter) return [];
-      const phoneCoordinates = coordinatePair(phone.gpsLatitude, phone.gpsLongitude);
-      const scheduleCoordinates = coordinatePair(
-        scheduleWithLocation?.gpsLatitude,
-        scheduleWithLocation?.gpsLongitude,
-      );
-      const cycleCoordinates = coordinatePair(cycle?.target.latitude, cycle?.target.longitude);
-      const resolvedLocation = phoneCoordinates
-        ? { ...phoneCoordinates, source: "phone" as const }
-        : scheduleCoordinates
-          ? { ...scheduleCoordinates, source: "schedule" as const }
-          : cycleCoordinates
-            ? { ...cycleCoordinates, source: "cycle" as const }
-            : null;
-      if (!resolvedLocation) return [];
-      return [{
-        id: phone.id,
-        name: phone.name,
-        client,
-        latitude: resolvedLocation.latitude,
-        longitude: resolvedLocation.longitude,
-        locationSource: resolvedLocation.source,
-        status: phone.status,
-        cycleDay: cycle?.currentDay,
-        cycleDuration: cycle?.durationDays,
-        targetCity: cycle?.target.city,
-        proxyMode: cycle?.proxyMode ?? cycle?.proxy?.mode,
-        proxyCity: cycle?.proxy?.configuredCity,
-        proxyIsp: cycle?.proxy?.configuredIsp,
-        proxyHealth: cycle?.proxy?.health,
-        proxyDistanceKm: cycle?.proxy?.distanceKm,
-        proxyCheckedAt: cycle?.proxy?.checkedAt,
-      }];
-    });
-  }, [clientFilter, clientOptions, filteredCycles, phones, schedules]);
-  const mapTargets = useMemo<MapTarget[]>(() => {
-    const targets = new Map<string, MapTarget>();
-    for (const cycle of filteredCycles) {
-      const coordinates = coordinatePair(cycle.target.latitude, cycle.target.longitude);
-      if (!coordinates) continue;
-      const coordinateKey = `${cycle.clientId}:${coordinates.latitude}:${coordinates.longitude}`;
-      if (targets.has(coordinateKey)) continue;
-      targets.set(coordinateKey, {
-        id: `cycle-${coordinateKey}`,
-        name: cycle.clientName,
-        ...coordinates,
-      });
-    }
-    for (const schedule of schedules) {
-      if (clientFilter !== "All clients" && schedule.client !== clientFilter) continue;
-      const coordinates = coordinatePair(schedule.gpsLatitude, schedule.gpsLongitude);
-      if (!coordinates) continue;
-      const coordinateKey = `${schedule.client}:${coordinates.latitude}:${coordinates.longitude}`;
-      if (targets.has(coordinateKey)) continue;
-      targets.set(coordinateKey, {
-        id: `schedule-${schedule.id}`,
-        name: schedule.client,
-        ...coordinates,
-      });
-    }
-    return Array.from(targets.values());
-  }, [clientFilter, filteredCycles, schedules]);
 
   function chooseMetric(filter: string) {
     setStageFilter((current) => current === filter ? "All stages" : filter);
@@ -1661,13 +1583,14 @@ export function CommandCenter({
       </div>
 
       <div className="command-location-grid">
-        <section className="command-panel location-panel" aria-label="Device location map">
-          <div className="command-panel-heading location-heading">
-            <div><h2>Device locations</h2><span>{mapPoints.length} devices · {mapTargets.length} targets · {clientFilter}</span></div>
-            <div className="map-legend" aria-label="Map legend"><span><i className="legend-business" />Target</span><span><i className="legend-device" />Devices</span><span><i className="legend-proxy" />Proxy external</span></div>
-          </div>
-          <DeviceLocationMap points={mapPoints} targets={mapTargets} onSetDeviceLocations={onOpenIntegration} />
-        </section>
+        <FleetLocationPanel
+          phones={phones}
+          schedules={schedules}
+          cycles={filteredCycles}
+          clientOptions={clientOptions}
+          clientFilter={clientFilter}
+          onOpenIntegration={onOpenIntegration}
+        />
 
         <section className="command-panel subscription-panel" aria-label="DuoPlus Subscription Startup capacity">
           <div className="command-panel-heading">
@@ -1754,7 +1677,7 @@ export function CommandCenter({
 
       <div className="command-secondary-grid">
         <section className="command-panel command-capacity" aria-label="Device capacity overview">
-          <div className="command-panel-heading"><h2>Device capacity</h2><span>{online} / {phones.length} online</span>{demo ? <button type="button" onClick={() => onNotify("Device inventory is available from Schedules and DuoPlus setup")}>View all devices <span aria-hidden="true">→</span></button> : <span>{phones.length} synced devices</span>}</div>
+          <div className="command-panel-heading"><h2>Device capacity</h2><span>{online} / {phones.length} online</span>{demo ? <button type="button" onClick={onOpenIntegration}>View all devices <span aria-hidden="true">→</span></button> : <span>{phones.length} synced devices</span>}</div>
           <div className="capacity-stats">
             <CapacityStat label="Online" value={online} tone="green" />
             <CapacityStat label="Busy" value={busy} tone="blue" />
@@ -1770,7 +1693,7 @@ export function CommandCenter({
         <section className="command-panel workload-panel" aria-label="Next 24 hours workload">
           <div className="command-panel-heading">
             <div><h2>Next 24 hours</h2><span>{workerSlotCount} worker {workerSlotCount === 1 ? "slot" : "slots"} · {plannedWorkloadCount} planned {plannedWorkloadCount === 1 ? "job" : "jobs"}{occupiedWorkerCount ? ` · ${occupiedWorkerCount} occupied` : ""}</span></div>
-            {demo ? <button type="button" onClick={() => onNotify("This sample timeline illustrates how six jobs share three slots. Open Schedules to inspect all 250 recurring tasks.")}>View full schedule <span aria-hidden="true">→</span></button> : null}
+            {onOpenSchedules ? <button type="button" onClick={onOpenSchedules}>View full schedule <span aria-hidden="true">→</span></button> : null}
           </div>
           <div className="workload-axis">{workloadAxis.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}</div>
           <div className="workload-grid">
@@ -2773,6 +2696,115 @@ function ProgramTemplateInputField({
   );
 }
 
+export function FleetLocationPanel({
+  phones,
+  schedules,
+  cycles,
+  clientOptions,
+  clientFilter,
+  onOpenIntegration,
+}: {
+  phones: CommandPhone[];
+  schedules: CommandSchedule[];
+  cycles: CommandDeviceCycle[];
+  clientOptions: CommandClientOption[];
+  clientFilter: string;
+  onOpenIntegration: () => void;
+}) {
+  const filteredCycles = useMemo(() => cycles.filter((cycle) =>
+    ["provisioning", "active", "paused", "blocked"].includes(cycle.status)
+    && (clientFilter === "All clients" || cycle.clientName === clientFilter),
+  ), [clientFilter, cycles]);
+  const mapPoints = useMemo<MapPoint[]>(() => {
+    const cycleByPhone = new Map(filteredCycles.map((cycle) => [cycle.phoneId, cycle]));
+    const clientById = new Map(clientOptions.map((client) => [client.id, client.name]));
+    return phones.flatMap((phone) => {
+      const cycle = cycleByPhone.get(phone.id);
+      const assignedSchedules = schedules.filter((item) =>
+        item.phoneId === phone.id || item.device === phone.name,
+      );
+      const schedule = assignedSchedules[0];
+      const scheduleWithLocation = assignedSchedules.find((item) =>
+        coordinatePair(item.gpsLatitude, item.gpsLongitude) != null,
+      );
+      const client = cycle?.clientName
+        ?? (phone.clientId ? clientById.get(phone.clientId) : undefined)
+        ?? schedule?.client
+        ?? "Unassigned";
+      if (clientFilter !== "All clients" && client !== clientFilter) return [];
+      const phoneCoordinates = coordinatePair(phone.gpsLatitude, phone.gpsLongitude);
+      const scheduleCoordinates = coordinatePair(
+        scheduleWithLocation?.gpsLatitude,
+        scheduleWithLocation?.gpsLongitude,
+      );
+      const cycleCoordinates = coordinatePair(cycle?.target.latitude, cycle?.target.longitude);
+      const resolvedLocation = phoneCoordinates
+        ? { ...phoneCoordinates, source: "phone" as const }
+        : scheduleCoordinates
+          ? { ...scheduleCoordinates, source: "schedule" as const }
+          : cycleCoordinates
+            ? { ...cycleCoordinates, source: "cycle" as const }
+            : null;
+      if (!resolvedLocation) return [];
+      return [{
+        id: phone.id,
+        name: phone.name,
+        client,
+        latitude: resolvedLocation.latitude,
+        longitude: resolvedLocation.longitude,
+        locationSource: resolvedLocation.source,
+        status: phone.status,
+        cycleDay: cycle?.currentDay,
+        cycleDuration: cycle?.durationDays,
+        targetCity: cycle?.target.city,
+        proxyMode: cycle?.proxyMode ?? cycle?.proxy?.mode,
+        proxyCity: cycle?.proxy?.configuredCity,
+        proxyIsp: cycle?.proxy?.configuredIsp,
+        proxyHealth: cycle?.proxy?.health,
+        proxyDistanceKm: cycle?.proxy?.distanceKm,
+        proxyCheckedAt: cycle?.proxy?.checkedAt,
+      }];
+    });
+  }, [clientFilter, clientOptions, filteredCycles, phones, schedules]);
+  const mapTargets = useMemo<MapTarget[]>(() => {
+    const targets = new Map<string, MapTarget>();
+    for (const cycle of filteredCycles) {
+      const coordinates = coordinatePair(cycle.target.latitude, cycle.target.longitude);
+      if (!coordinates) continue;
+      const coordinateKey = `${cycle.clientId}:${coordinates.latitude}:${coordinates.longitude}`;
+      if (targets.has(coordinateKey)) continue;
+      targets.set(coordinateKey, {
+        id: `cycle-${coordinateKey}`,
+        name: cycle.clientName,
+        ...coordinates,
+      });
+    }
+    for (const schedule of schedules) {
+      if (clientFilter !== "All clients" && schedule.client !== clientFilter) continue;
+      const coordinates = coordinatePair(schedule.gpsLatitude, schedule.gpsLongitude);
+      if (!coordinates) continue;
+      const coordinateKey = `${schedule.client}:${coordinates.latitude}:${coordinates.longitude}`;
+      if (targets.has(coordinateKey)) continue;
+      targets.set(coordinateKey, {
+        id: `schedule-${schedule.id}`,
+        name: schedule.client,
+        ...coordinates,
+      });
+    }
+    return Array.from(targets.values());
+  }, [clientFilter, filteredCycles, schedules]);
+
+  return (
+    <section className="command-panel location-panel" aria-label="Device location map">
+      <div className="command-panel-heading location-heading">
+        <div><h2>Device locations</h2><span>{mapPoints.length} devices · {mapTargets.length} targets · {clientFilter}</span></div>
+        <div className="map-legend" aria-label="Map legend"><span><i className="legend-business" />Target</span><span><i className="legend-device" />Devices</span><span><i className="legend-proxy" />Proxy external</span></div>
+      </div>
+      <DeviceLocationMap points={mapPoints} targets={mapTargets} onSetDeviceLocations={onOpenIntegration} />
+    </section>
+  );
+}
+
 function DeviceLocationMap({
   points,
   targets,
@@ -2782,12 +2814,14 @@ function DeviceLocationMap({
   targets: MapTarget[];
   onSetDeviceLocations: () => void;
 }) {
+  const mapElementRef = useRef<HTMLDivElement>(null);
+  const [mapSize, setMapSize] = useState({ width: 640, height: 360 });
   const allCoordinates = [...points, ...targets];
-  const fittedZoom = mapZoomFor(allCoordinates);
+  const fittedZoom = mapZoomFor(allCoordinates, mapSize.width, mapSize.height);
   const coordinateKey = [
     ...points.map((point) => `device:${point.id}:${point.latitude}:${point.longitude}`),
     ...targets.map((target) => `target:${target.id}:${target.latitude}:${target.longitude}`),
-  ].sort().join("|");
+  ].sort().join("|") + `@${mapSize.width}x${mapSize.height}`;
   const [zoomState, setZoomState] = useState(() => ({ coordinateKey, value: fittedZoom }));
   const zoom = zoomState.coordinateKey === coordinateKey ? zoomState.value : fittedZoom;
   const [selectedPoint, setSelectedPoint] = useState<string | null>(points[0]?.id ?? null);
@@ -2799,6 +2833,20 @@ function DeviceLocationMap({
     loaded: Set<string>;
     failed: Set<string>;
   }>(() => ({ key: tileRenderKey, loaded: new Set(), failed: new Set() }));
+
+  useEffect(() => {
+    const element = mapElementRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (!entry || entry.contentRect.width <= 0 || entry.contentRect.height <= 0) return;
+      const width = Math.round(entry.contentRect.width);
+      const height = Math.round(entry.contentRect.height);
+      setMapSize((current) => current.width === width && current.height === height
+        ? current : { width, height });
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [coordinateKey]);
 
   useEffect(() => {
     setSelectedPoint((current) => {
@@ -2820,9 +2868,11 @@ function DeviceLocationMap({
     );
   }
 
-  const latitude = allCoordinates.reduce((sum, point) => sum + point.latitude, 0) / allCoordinates.length;
-  const longitude = allCoordinates.reduce((sum, point) => sum + point.longitude, 0) / allCoordinates.length;
-  const center = mercatorPoint(latitude, longitude, zoom);
+  const projected = allCoordinates.map((point) => mercatorPoint(point.latitude, point.longitude, zoom));
+  const center = {
+    x: (Math.min(...projected.map((point) => point.x)) + Math.max(...projected.map((point) => point.x))) / 2,
+    y: (Math.min(...projected.map((point) => point.y)) + Math.max(...projected.map((point) => point.y))) / 2,
+  };
   const scaleTiles = 2 ** zoom;
   const centerTileX = Math.floor(center.x / 256);
   const centerTileY = Math.floor(center.y / 256);
@@ -2863,7 +2913,7 @@ function DeviceLocationMap({
   }
 
   return (
-    <div className="device-map" role="region" aria-label={`Map showing ${points.length} DuoPlus device locations and ${targets.length} targets`}>
+    <div ref={mapElementRef} className="device-map" role="region" aria-label={`Map showing ${points.length} DuoPlus device locations and ${targets.length} targets`}>
       <div className="map-tiles" aria-hidden="true">
         {tiles.map((tile) => (
           // OpenStreetMap serves raster tiles; Next Image optimization is not appropriate for dynamic tile coordinates.
@@ -2931,6 +2981,7 @@ function DeviceLocationMap({
       })}
       {activePoint ? (
         <div className="map-popover">
+          <button className="map-popover-close" type="button" onClick={() => setSelectedPoint(null)} aria-label="Close device details"><X size={12} /></button>
           <div className="map-popover-statuses">
             <span className={activePoint.status === 1 ? "map-status-online" : "map-status-offline"}><i />{activePoint.status === 1 ? "Online" : "Offline"}</span>
             <span className={`proxy-status proxy-status-${usesExternalDeviceProxy(activePoint) ? "gray" : proxyHealthTone(activePoint.proxyHealth)}`}><i />{usesExternalDeviceProxy(activePoint) ? "Existing device proxy" : proxyHealthLabel(activePoint.proxyHealth)}</span>
@@ -2964,8 +3015,9 @@ function DeviceLocationMap({
         </div>
       ) : null}
       <div className="map-controls" aria-label="Map zoom controls">
+        <button type="button" onClick={() => setZoomState({ coordinateKey, value: fittedZoom })} aria-label="Fit all devices"><RefreshCw size={15} /></button>
         <button type="button" onClick={() => setZoomState({ coordinateKey, value: Math.min(17, zoom + 1) })} aria-label="Zoom in"><ZoomIn size={15} /></button>
-        <button type="button" onClick={() => setZoomState({ coordinateKey, value: Math.max(3, zoom - 1) })} aria-label="Zoom out"><ZoomOut size={15} /></button>
+        <button type="button" onClick={() => setZoomState({ coordinateKey, value: Math.max(1, zoom - 1) })} aria-label="Zoom out"><ZoomOut size={15} /></button>
       </div>
       <a className="map-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
     </div>

@@ -40,6 +40,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CommandCenter,
+  FleetLocationPanel,
   type CommandDeviceCycle,
   type CommandRun,
   type CommandProfileReadiness,
@@ -1130,6 +1131,15 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
     });
   }, [cadenceFilter, clientFilter, query, schedules, statusFilter]);
 
+  const visibleMapPhones = useMemo(() => schedulablePhones.filter((phone) =>
+    filteredSchedules.some((schedule) => schedule.phoneId === phone.id
+      || (!schedule.phoneId && schedule.device === phone.name)),
+  ), [filteredSchedules, schedulablePhones]);
+  const visibleMapCycles = useMemo(() => {
+    const phoneIds = new Set(visibleMapPhones.map((phone) => phone.id));
+    return deviceCycles.filter((cycle) => phoneIds.has(cycle.phoneId));
+  }, [deviceCycles, visibleMapPhones]);
+
   const runningCount = DEMO_MODE ? 3 : recentRuns.filter((run) => ["preparing", "running"].includes(run.status)).length;
   const dashboardNowMs = new Date(initialNow).getTime();
   const dueNowCount = DEMO_MODE ? 0 : recentRuns.filter((run) =>
@@ -1916,6 +1926,19 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
               <div className="timezone"><Globe2 size={16} /> <strong>Schedule-local times</strong></div>
             </div>
 
+            {filteredSchedules.length > 0 ? (
+              <div className="schedule-map-wrap">
+                <FleetLocationPanel
+                  phones={visibleMapPhones}
+                  schedules={filteredSchedules}
+                  cycles={visibleMapCycles}
+                  clientOptions={clientRecords}
+                  clientFilter={clientFilter}
+                  onOpenIntegration={() => setIntegrationOpen(true)}
+                />
+              </div>
+            ) : null}
+
             {dashboardError ? (
               <div className="dashboard-error" role="alert">
                 <CircleAlert size={17} />
@@ -2045,7 +2068,19 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
               const schedule = schedules.find((item) => item.id === scheduleId);
               if (schedule) void runNow(schedule);
             }}
+            onOpenSchedules={() => {
+              setQuery("");
+              setClientFilter("All clients");
+              setStatusFilter("All statuses");
+              setCadenceFilter("All cadences");
+              setDrawerOpen(false);
+              setActiveView("schedules");
+            }}
             onViewSchedule={(scheduleId) => {
+              setQuery("");
+              setClientFilter("All clients");
+              setStatusFilter("All statuses");
+              setCadenceFilter("All cadences");
               setSelectedId(scheduleId);
               setDrawerOpen(false);
               setActiveView("schedules");

@@ -3941,7 +3941,7 @@ input[type="checkbox"] {
 
 .device-map {
   position: relative;
-  height: 310px;
+  height: 360px;
   overflow: hidden;
   isolation: isolate;
   background: #dfe8dd;
@@ -5298,3 +5298,22 @@ input[type="checkbox"] {
   .phase-program-table th,
   .phase-program-table td { padding: 7px 5px; font-size: 9px; }
 }
+
+/* Reuse the same fleet map on Schedules and Command center. */
+.schedule-map-wrap { padding: 0 14px 14px; }
+.map-popover-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: #5d6b83;
+  background: transparent;
+  cursor: pointer;
+}
+.map-popover-close:hover { background: #eef3fb; }
+.map-popover { padding-right: 28px; }
