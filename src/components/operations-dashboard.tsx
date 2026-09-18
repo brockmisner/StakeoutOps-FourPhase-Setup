@@ -1131,10 +1131,17 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
     });
   }, [cadenceFilter, clientFilter, query, schedules, statusFilter]);
 
-  const visibleMapPhones = useMemo(() => schedulablePhones.filter((phone) =>
-    filteredSchedules.some((schedule) => schedule.phoneId === phone.id
-      || (!schedule.phoneId && schedule.device === phone.name)),
-  ), [filteredSchedules, schedulablePhones]);
+  const visibleMapPhones = useMemo(() => {
+    // Keep cycle-only and unscheduled phones on the fleet map. Task filters
+    // narrow pins to the devices represented by the matching schedule rows.
+    if (!query.trim() && statusFilter === "All statuses" && cadenceFilter === "All cadences") {
+      return schedulablePhones;
+    }
+    return schedulablePhones.filter((phone) =>
+      filteredSchedules.some((schedule) => schedule.phoneId === phone.id
+        || (!schedule.phoneId && schedule.device === phone.name)),
+    );
+  }, [cadenceFilter, filteredSchedules, query, schedulablePhones, statusFilter]);
   const visibleMapCycles = useMemo(() => {
     const phoneIds = new Set(visibleMapPhones.map((phone) => phone.id));
     return deviceCycles.filter((cycle) => phoneIds.has(cycle.phoneId));
@@ -1926,7 +1933,7 @@ export function OperationsDashboard({ initialNow, systemReady }: { initialNow: s
               <div className="timezone"><Globe2 size={16} /> <strong>Schedule-local times</strong></div>
             </div>
 
-            {filteredSchedules.length > 0 ? (
+            {visibleMapPhones.length > 0 || filteredSchedules.length > 0 ? (
               <div className="schedule-map-wrap">
                 <FleetLocationPanel
                   phones={visibleMapPhones}

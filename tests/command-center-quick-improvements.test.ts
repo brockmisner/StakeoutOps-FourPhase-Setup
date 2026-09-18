@@ -174,7 +174,7 @@ describe("command center quick improvements", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: /command center/i })).toBeTruthy();
     expect(screen.queryByRole("complementary", { name: /add schedule|edit schedule/i })).toBeNull();
-    expect(screen.getByRole("button", { name: "Command center" })).toHaveProperty("disabled", false);
+    expect(within(screen.getByRole("complementary", { name: "Primary navigation" })).getByRole("button", { name: "Command center" })).toHaveProperty("disabled", false);
   });
 
   it("does not render unfinished navigation as working destinations or show a fake run badge", () => {
@@ -192,7 +192,7 @@ describe("command center quick improvements", () => {
     }
     expect(document.querySelector(".nav-badge")).toBeNull();
 
-    const schedulesButton = screen.getByRole("button", { name: "Schedules" });
+    const schedulesButton = within(navigation).getByRole("button", { name: "Schedules" });
     expect(schedulesButton).toHaveProperty("disabled", false);
     fireEvent.click(schedulesButton);
     expect(screen.getByRole("heading", { level: 1, name: "Schedules" })).toBeTruthy();
@@ -568,8 +568,11 @@ describe("command center quick improvements", () => {
       systemReady: false,
     }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Schedules" }));
-    fireEvent.click(screen.getByRole("button", { name: /add schedule/i }));
+    const navigation = screen.getByRole("complementary", { name: "Primary navigation" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Schedules" }));
+    const heading = screen.getByRole("heading", { level: 1, name: "Schedules" }).closest(".page-heading");
+    expect(heading).not.toBeNull();
+    fireEvent.click(within(heading as HTMLElement).getByRole("button", { name: /add schedule/i }));
 
     const templateSearch = screen.getByLabelText("Search templates");
     const templateSelect = screen.getByRole("combobox", { name: "Template" });
